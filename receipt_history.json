@@ -116,5 +116,104 @@
             }
         ],
         "advice": "Buying produce is a great start, but remember: a fruit a day keeps the budget in play!"
+    },
+    {
+        "store": "Unreadable",
+        "date": "Unreadable",
+        "total": 0.0,
+        "items": [],
+        "advice": "Unreadable receipt? That's one way to keep your spending a mystery!"
+    },
+    {
+        "store": "Green Supermarket",
+        "date": "N/A",
+        "total": 27.35,
+        "items": [
+            {
+                "name": "APPLE",
+                "qty": 2,
+                "price": 1.0,
+                "category": "Food"
+            },
+            {
+                "name": "BANANA",
+                "qty": 3,
+                "price": 1.5,
+                "category": "Food"
+            },
+            {
+                "name": "ORANGE",
+                "qty": 2,
+                "price": 1.2,
+                "category": "Food"
+            },
+            {
+                "name": "PEAR",
+                "qty": 1,
+                "price": 0.75,
+                "category": "Food"
+            },
+            {
+                "name": "GRAPES",
+                "qty": 2,
+                "price": 3.0,
+                "category": "Food"
+            },
+            {
+                "name": "STRAWBERRY",
+                "qty": 1,
+                "price": 2.5,
+                "category": "Food"
+            },
+            {
+                "name": "BLUEBERRY",
+                "qty": 1,
+                "price": 2.0,
+                "category": "Food"
+            },
+            {
+                "name": "KIWI",
+                "qty": 2,
+                "price": 1.8,
+                "category": "Food"
+            },
+            {
+                "name": "WATERMELON",
+                "qty": 1,
+                "price": 4.5,
+                "category": "Food"
+            },
+            {
+                "name": "LEMON",
+                "qty": 1,
+                "price": 0.6,
+                "category": "Food"
+            },
+            {
+                "name": "RASPBERRY",
+                "qty": 1,
+                "price": 3.0,
+                "category": "Food"
+            },
+            {
+                "name": "MILK",
+                "qty": 1,
+                "price": 1.5,
+                "category": "Food"
+            },
+            {
+                "name": "CHEESE",
+                "qty": 1,
+                "price": 2.8,
+                "category": "Food"
+            },
+            {
+                "name": "YOGURT",
+                "qty": 1,
+                "price": 1.2,
+                "category": "Food"
+            }
+        ],
+        "advice": "Eat your greens, but don't let your money turn green with envy over what you can't afford!"
     }
 ]

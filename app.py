@@ -16,7 +16,8 @@ load_dotenv(override=True)
 st.set_page_config(page_title="AI Receipt Intelligence", page_icon="🧾", layout="wide")
 
 # Fetch API Key
-api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+# API Key ko Streamlit Secrets se uthayein
+api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
     st.error("❌ API Key nahi mili! Check karein ke .env file mein GOOGLE_API_KEY mojood hai.")
@@ -60,26 +61,49 @@ def analyze_receipt(image_pil, model_name):
 st.title("🧾 AI Receipt Intelligence")
 active_model = get_supported_model()
 
-# --- SIDEBAR: TOTAL SPENDING SUMMARY (NEW) ---
+# --- SIDEBAR: DATA LOADING & CALCULATION ---
 st.sidebar.title("📊 Financial Summary")
 history_data = load_history()
 
+# Inialize variables (Errors se bachne ke liye)
+grand_total = 0.0
+receipt_count = 0
+all_totals = []
+
 if history_data:
-    # Total kharcha calculate karna
     all_totals = [float(entry.get('total', 0)) for entry in history_data]
     grand_total = sum(all_totals)
     receipt_count = len(history_data)
-    
-    # Summary Metrics
+
+# --- SIDEBAR: DISPLAY METRICS ---
+if history_data:
     st.sidebar.metric("💰 Total Spent (All Time)", f"${grand_total:.2f}")
     st.sidebar.metric("📑 Total Receipts", receipt_count)
     
-    # Chota sa bar chart sidebar mein (Spending per receipt)
     if len(all_totals) > 1:
         st.sidebar.write("📈 Spending Trend")
         st.sidebar.line_chart(all_totals)
 else:
-    st.sidebar.info("No data yet. Analyze a receipt to see your summary!")
+    st.sidebar.info("No data yet. Analyze a receipt!")
+
+# --- SIDEBAR: BUDGET ALERT SYSTEM ---
+st.sidebar.divider()
+st.sidebar.subheader("🎯 Budget Settings")
+user_budget = st.sidebar.number_input("Set Monthly Budget ($)", min_value=1.0, value=1000.0)
+
+if history_data:
+    percentage_used = (grand_total / user_budget) * 100
+    
+    if percentage_used >= 100:
+        st.sidebar.error(f"🚨 BUDGET EXCEEDED! ({percentage_used:.1f}%)")
+        st.sidebar.warning("AI: Stop spending or start a side hustle!")
+    elif percentage_used >= 80:
+        st.sidebar.warning(f"⚠️ Warning: {percentage_used:.1f}% used.")
+        st.sidebar.info("AI: You're getting dangerously close to being broke.")
+    else:
+        st.sidebar.success(f"✅ Safe: {percentage_used:.1f}% used.")
+    
+    st.sidebar.progress(min(percentage_used / 100, 1.0))
 
 st.sidebar.divider()
 st.sidebar.success(f"✅ Active Model: {active_model}")
@@ -92,61 +116,51 @@ if uploaded_file:
     col1, col2 = st.columns([1, 1])
     
     with col1:
-        st.subheader("🖼️ Receipt Preview")
+        st.subheader("🖼️ Preview")
         st.image(image, use_container_width=True)
         
         if st.button("🚀 Analyze Receipt", use_container_width=True):
-            with st.spinner("AI is extracting data..."):
+            with st.spinner("AI is thinking..."):
                 result = analyze_receipt(image, active_model)
-                
                 if "error" in result:
                     st.error(f"Analysis Failed: {result['error']}")
                 else:
                     st.session_state['receipt_data'] = result
                     save_to_history(result) 
-                    st.success("✅ Analysis Done & Saved to History!")
-                    st.rerun() # Refresh taake sidebar metrics update ho jayen
+                    st.success("✅ Saved to History!")
+                    st.rerun()
 
     if 'receipt_data' in st.session_state:
         res = st.session_state['receipt_data']
         with col2:
-            st.subheader(f"🏪 {res.get('store', 'Store Name')}")
-            st.caption(f"📅 Date: {res.get('date', 'N/A')}")
-            
+            st.subheader(f"🏪 {res.get('store', 'Store')}")
             df = pd.DataFrame(res.get('items', []))
             if not df.empty:
                 st.dataframe(df, use_container_width=True, hide_index=True)
-                total_calc = df['price'].sum()
-                st.metric("Receipt Total", f"${total_calc:.2f}")
-                
+                st.metric("Receipt Total", f"${res.get('total', 0.0):.2f}")
                 fig = px.pie(df, values='price', names='category', hole=0.4)
                 st.plotly_chart(fig, use_container_width=True)
                 
                 csv = df.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Download CSV", data=csv, file_name="receipt.csv", mime='text/csv')
             
-            st.divider()
-            st.info(f"💡 AI Advice: {res.get('advice', 'Keep saving!')}")
+            st.info(f"💡 AI Advice: {res.get('advice')}")
 else:
     st.info("Upload a receipt to get started.")
 
-# --- SIDEBAR: HISTORY ---
+# --- SIDEBAR: HISTORY LIST ---
 st.sidebar.divider()
-st.sidebar.subheader("📜 Receipt History")
-
+st.sidebar.subheader("📜 History")
 if st.sidebar.button("View Past Receipts"):
     if history_data:
         for idx, entry in enumerate(reversed(history_data)):
-            store_name = entry.get('store', 'Unknown')
-            date_val = entry.get('date', 'N/A')
-            with st.sidebar.expander(f"🧾 {store_name} ({date_val})"):
+            with st.sidebar.expander(f"🧾 {entry.get('store')} ({entry.get('date')})"):
                 st.write(f"**Total:** ${entry.get('total')}")
                 if 'items' in entry:
                     st.dataframe(pd.DataFrame(entry.get('items')), hide_index=True)
     else:
-        st.sidebar.info("No history found.")
+        st.sidebar.info("No history.")
 
-if st.sidebar.button("🗑️ Clear All History"):
+if st.sidebar.button("🗑️ Clear History"):
     clear_history()
-    st.sidebar.success("History Cleared!")
     st.rerun()
