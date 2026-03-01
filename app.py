@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 from history_manager import save_to_history, load_history, clear_history
 
-# Load environment variables
+# Load environment variables (Local development ke liye)
 load_dotenv(override=True)
 
 # --- APP CONFIGURATION ---
@@ -22,8 +22,15 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- API KEY HANDLING ---
-api_key = st.secrets.get("GOOGLE_API_KEY") or os.getenv("GOOGLE_API_KEY")
+# --- API KEY HANDLING (Line 26 Fix) ---
+# Pehle check karein ke kya secrets available hain taake crash na ho
+api_key = None
+try:
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+except Exception:
+    # Agar local par secrets file nahi milti, to .env se uthayein
+    api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
     st.error("❌ API Key missing! Please add GOOGLE_API_KEY to Streamlit Secrets or .env file.")
@@ -54,6 +61,7 @@ def analyze_receipt(image_pil, model_name):
     Strictly return ONLY JSON."""
     try:
         model = genai.GenerativeModel(model_name)
+        # Content generation with image
         response = model.generate_content([prompt, image_pil])
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if match:
@@ -105,11 +113,10 @@ if history_data:
         st.sidebar.success(f"✅ Safe: {percentage_used:.1f}% used.")
     st.sidebar.progress(min(percentage_used / 100, 1.0))
 
-# --- SIDEBAR: CLEAN QR CODE (No Dinosaur) ---
+# --- SIDEBAR: CLEAN QR CODE ---
 st.sidebar.divider()
 st.sidebar.subheader("📱 Share App")
 if st.sidebar.button("Generate QR Code"):
-    # Apni actual app ka link yahan likhein
     app_url = "https://ai-receipt-analyzer-samreensami.streamlit.app" 
     qr_bytes = generate_clean_qr(app_url)
     st.sidebar.image(qr_bytes, caption="Scan to open (Clean QR)")
