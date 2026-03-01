@@ -6,72 +6,69 @@ import re
 import io
 import sys
 import traceback
-from config import Config
+from dotenv import load_dotenv
 
-# Force stable v1 API
-os.environ['GOOGLE_GENAI_USE_V1'] = 'true'
+# Force load environment to ensure fresh key
+load_dotenv(override=True)
 
 class ReceiptAnalyzer:
     def __init__(self):
-        if not Config.GOOGLE_API_KEY:
-            raise ValueError("GOOGLE_API_KEY is missing in .env")
-            
-        genai.configure(api_key=Config.GOOGLE_API_KEY)
+        # Directly fetch from OS to avoid config.py cache issues
+        self.api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         
+        if not self.api_key:
+            raise ValueError("❌ API Key missing! Check your .env file.")
+            
+        genai.configure(api_key=self.api_key)
+        
+        # Model switch: 'gemini-1.5-flash' is best for speed, 
+        # but 'gemini-1.5-flash-latest' can sometimes bypass version errors
         try:
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
+            self.model = genai.GenerativeModel('gemini-1.5-flash-latest')
         except Exception:
-            self.model = genai.GenerativeModel('models/gemini-1.5-flash')
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
 
     def preprocess_image(self, image_bytes):
-        """Step 1: Optional Image Enhancement for better OCR."""
         img = Image.open(io.BytesIO(image_bytes))
-        # Convert to RGB if necessary
         if img.mode != 'RGB':
             img = img.convert('RGB')
         
-        # Apply enhancements
-        img = ImageOps.grayscale(img).convert("RGB")
-        img = ImageEnhance.Contrast(img).enhance(1.5)
-        img = ImageEnhance.Brightness(img).enhance(1.1)
+        # Thori kam enhancement rakhein taaki AI asli text dekh sakay
+        img = ImageEnhance.Contrast(img).enhance(1.2)
         return img
 
     def analyze(self, image_file_bytes):
-        """Steps 2, 3 & 4: Extraction, Structuring, and Categorization."""
         try:
-            # Step 1: Pre-process
             img = self.preprocess_image(image_file_bytes)
             
-            # Step 2 & 3: Prompt for Structured Data
+            # Refined prompt for more stable JSON
             prompt = """
-            OCR this receipt and return a valid JSON object.
-            
-            CATEGORIES (Strictly use one of these): 
-            [Food, Drink, Transport, Household, Entertainment, Other]
-
-            JSON STRUCTURE:
+            Extract receipt data into JSON. 
+            Categories: [Food, Drink, Transport, Household, Entertainment, Clothes, Other]
+            Format:
             {
                 "store_name": "string",
                 "date": "string",
                 "total": number,
-                "items": [
-                    {"name": "string", "qty": number, "price": number, "category": "category_name"}
-                ],
-                "advice": "Give a witty, sarcastic, yet helpful one-sentence budgeting tip based on these items."
+                "items": [{"name": "string", "qty": number, "price": number, "category": "string"}],
+                "advice": "string"
             }
-            Return ONLY the raw JSON.
+            Return ONLY JSON. No markdown.
             """
 
+            # API Call
             response = self.model.generate_content([prompt, img])
             
-            # Step 3: Data Cleaning (Regex for Markdown)
-            raw_text = response.text.strip()
-            clean_json = re.sub(r'```json|```', '', raw_text).strip()
-            
+            # Safety check for empty response
+            if not response.text:
+                return {"error": "AI returned empty text"}
+
+            # Clean JSON
+            clean_json = re.sub(r'```json|```', '', response.text).strip()
             data = json.loads(clean_json)
             
-            # Step 4: Categorization Sanitization
-            valid_cats = ['Food', 'Drink', 'Transport', 'Household', 'Entertainment', 'Other']
+            # Sanitization
+            valid_cats = ['Food', 'Drink', 'Transport', 'Household', 'Entertainment', 'Clothes', 'Other']
             for item in data.get('items', []):
                 if item.get('category') not in valid_cats:
                     item['category'] = 'Other'
@@ -79,8 +76,10 @@ class ReceiptAnalyzer:
             return data
 
         except Exception as e:
-            print("\n" + "!"*60)
-            print("❌ ANALYZER ERROR")
-            traceback.print_exc(file=sys.stdout)
-            print("!"*60 + "\n")
-            return {"error": "AI Extraction Failed", "message": str(e)}
+            # Check for API Key specific errors
+            err_msg = str(e)
+            if "API_KEY_INVALID" in err_msg or "400" in err_msg:
+                return {"error": "Invalid API Key", "message": "Google says your API key is wrong."}
+            
+            print("❌ ANALYZER ERROR:", err_msg)
+            return {"error": "Processing Failed", "message": err_msg}

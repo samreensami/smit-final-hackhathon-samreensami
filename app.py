@@ -7,150 +7,146 @@ import os
 import re
 from dotenv import load_dotenv
 import google.generativeai as genai
+from history_manager import save_to_history, load_history, clear_history
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # --- APP CONFIGURATION ---
 st.set_page_config(page_title="AI Receipt Intelligence", page_icon="🧾", layout="wide")
 
-# Initialize Gemini Client (New SDK)
-api_key = os.getenv("GOOGLE_API_KEY")
+# Fetch API Key
+api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
 if not api_key:
-    st.error("❌ GOOGLE_API_KEY not found in .env file.")
+    st.error("❌ API Key nahi mili! Check karein ke .env file mein GOOGLE_API_KEY mojood hai.")
     st.stop()
 
-# Configure the GenAI SDK
-genai.configure(api_key=api_key)
+# Configure Gemini
+genai.configure(api_key=api_key.strip())
 
 def get_supported_model():
-    """Dynamically finds the correct model name to avoid 404 errors."""
     try:
-        # List all models available to this API key
         available_models = [m.name for m in genai.list_models()]
-
-        # Priority list of models to try
-        targets = [
-            "models/gemini-1.5-flash",
-            "gemini-1.5-flash",
-            "models/gemini-1.5-flash-latest",
-            "gemini-1.5-flash-latest"
-        ]
-
+        targets = ["models/gemini-1.5-flash", "models/gemini-1.5-flash-latest"]
         for target in targets:
-            if target in available_models:
-                return target
-
-        # If no specific flash model found, return the first one that supports generateContent
+            if target in available_models: return target
         return available_models[0] if available_models else "gemini-1.5-flash"
-    except Exception as e:
-        # Hard fallback
+    except:
         return "gemini-1.5-flash"
 
-def clean_json_response(text):
-    """Extracts JSON from the AI response, handling markdown blocks."""
-    match = re.search(r'\{.*\}', text, re.DOTALL)
-    if match:
-        return match.group()
-    return text.strip()
-
 def analyze_receipt(image_pil, model_name):
-    """Sends image to the discovered Gemini model."""
-    prompt = """
-    Analyze this receipt image. 
-    Return ONLY a valid JSON object with the following keys:
+    prompt = """Analyze this receipt image. Return ONLY a valid JSON object:
     {
-      "store": "Name of Store",
-      "date": "Date of Receipt",
-      "items": [
-        {"name": "Item Name", "qty": 1, "price": 10.99, "category": "Food/Drinks/Others"}
-      ],
-      "advice": "A witty, sarcastic, but helpful one-sentence budgeting tip."
+      "store": "Name",
+      "date": "Date",
+      "total": 0.0,
+      "items": [{"name": "Item", "qty": 1, "price": 0.0, "category": "Food/Drinks/Others"}],
+      "advice": "One witty budgeting tip"
     }
-    Strictly categorize every item into: Food, Drinks, or Others.
-    If quantity is missing, use 1. Correct obvious OCR errors.
-    """
+    Strictly return ONLY JSON."""
     
     try:
         model = genai.GenerativeModel(model_name)
         response = model.generate_content([prompt, image_pil])
-        
-        if not response.text:
-            return {"error": "AI returned an empty response."}
-            
-        cleaned_data = clean_json_response(response.text)
-        return json.loads(cleaned_data)
-        
+        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        if match:
+            return json.loads(match.group())
+        return {"error": "AI response was not in JSON format."}
     except Exception as e:
         return {"error": str(e)}
 
-# --- UI LAYOUT ---
-st.title("🧾 AI Receipt Intelligence (Auto-Discovery Mode)")
-st.markdown("This version automatically finds the correct API endpoint for your region.")
-
-# Diagnostic: Show active model
+# --- UI INTERFACE ---
+st.title("🧾 AI Receipt Intelligence")
 active_model = get_supported_model()
+
+# --- SIDEBAR: TOTAL SPENDING SUMMARY (NEW) ---
+st.sidebar.title("📊 Financial Summary")
+history_data = load_history()
+
+if history_data:
+    # Total kharcha calculate karna
+    all_totals = [float(entry.get('total', 0)) for entry in history_data]
+    grand_total = sum(all_totals)
+    receipt_count = len(history_data)
+    
+    # Summary Metrics
+    st.sidebar.metric("💰 Total Spent (All Time)", f"${grand_total:.2f}")
+    st.sidebar.metric("📑 Total Receipts", receipt_count)
+    
+    # Chota sa bar chart sidebar mein (Spending per receipt)
+    if len(all_totals) > 1:
+        st.sidebar.write("📈 Spending Trend")
+        st.sidebar.line_chart(all_totals)
+else:
+    st.sidebar.info("No data yet. Analyze a receipt to see your summary!")
+
+st.sidebar.divider()
 st.sidebar.success(f"✅ Active Model: {active_model}")
 
-if st.sidebar.button("🔍 List All My Models"):
-    models = [m.name for m in genai.list_models()]
-    st.sidebar.write(models)
-
-st.divider()
-
-uploaded_file = st.file_uploader("📤 Upload Receipt Image", type=["jpg", "png", "jpeg"])
+# --- MAIN PAGE: UPLOAD ---
+uploaded_file = st.file_uploader("Choose a receipt image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    col_img, col_res = st.columns([1, 1])
+    col1, col2 = st.columns([1, 1])
     
-    with col_img:
-        st.subheader("🖼️ Uploaded Receipt")
+    with col1:
+        st.subheader("🖼️ Receipt Preview")
         st.image(image, use_container_width=True)
-        analyze_btn = st.button("🚀 Run AI Analysis", use_container_width=True)
-
-    if analyze_btn:
-        with st.spinner(f"🧠 Analysis in progress using {active_model}..."):
-            result = analyze_receipt(image, active_model)
-            
-            if "error" in result:
-                st.error(f"❌ Analysis Failed: {result['error']}")
-                st.info("💡 Hint: If you see 404, click 'List All My Models' in the sidebar and check the terminal logs.")
-            else:
-                st.session_state['receipt_data'] = result
-                st.success("✅ Analysis Complete!")
+        
+        if st.button("🚀 Analyze Receipt", use_container_width=True):
+            with st.spinner("AI is extracting data..."):
+                result = analyze_receipt(image, active_model)
+                
+                if "error" in result:
+                    st.error(f"Analysis Failed: {result['error']}")
+                else:
+                    st.session_state['receipt_data'] = result
+                    save_to_history(result) 
+                    st.success("✅ Analysis Done & Saved to History!")
+                    st.rerun() # Refresh taake sidebar metrics update ho jayen
 
     if 'receipt_data' in st.session_state:
-        data = st.session_state['receipt_data']
-        items = data.get("items", [])
-        
-        if items:
-            df = pd.DataFrame(items)
-            df['price'] = pd.to_numeric(df['price'], errors='coerce').fillna(0)
-            df['qty'] = pd.to_numeric(df['qty'], errors='coerce').fillna(1)
-            df['total'] = df['price'] * df['qty']
+        res = st.session_state['receipt_data']
+        with col2:
+            st.subheader(f"🏪 {res.get('store', 'Store Name')}")
+            st.caption(f"📅 Date: {res.get('date', 'N/A')}")
             
-            with col_res:
-                st.subheader(f"🏪 {data.get('store', 'Unknown Store')}")
-                st.caption(f"📅 Date: {data.get('date', 'Unknown Date')}")
+            df = pd.DataFrame(res.get('items', []))
+            if not df.empty:
+                st.dataframe(df, use_container_width=True, hide_index=True)
+                total_calc = df['price'].sum()
+                st.metric("Receipt Total", f"${total_calc:.2f}")
                 
-                total_val = df['total'].sum()
-                cat_summary = df.groupby('category')['total'].sum().reset_index()
-                top_cat = cat_summary.loc[cat_summary['total'].idxmax(), 'category']
-                
-                m1, m2 = st.columns(2)
-                m1.metric("💰 Total Spent", f"${total_val:.2f}")
-                m2.metric("🏆 Top Category", top_cat)
-                
-                st.markdown("#### 📋 Itemized Breakdown")
-                st.dataframe(df[['name', 'qty', 'price', 'category', 'total']], use_container_width=True, hide_index=True)
-                
-                fig = px.pie(cat_summary, values='total', names='category', hole=0.4,
-                             color_discrete_sequence=px.colors.qualitative.Pastel)
+                fig = px.pie(df, values='price', names='category', hole=0.4)
                 st.plotly_chart(fig, use_container_width=True)
                 
-                st.divider()
-                st.subheader("💡 AI Budgeting Tip")
-                st.info(data.get("advice", "You're doing great!"))
+                csv = df.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Download CSV", data=csv, file_name="receipt.csv", mime='text/csv')
+            
+            st.divider()
+            st.info(f"💡 AI Advice: {res.get('advice', 'Keep saving!')}")
 else:
-    st.info("👋 Welcome! Please upload a receipt image.")
+    st.info("Upload a receipt to get started.")
+
+# --- SIDEBAR: HISTORY ---
+st.sidebar.divider()
+st.sidebar.subheader("📜 Receipt History")
+
+if st.sidebar.button("View Past Receipts"):
+    if history_data:
+        for idx, entry in enumerate(reversed(history_data)):
+            store_name = entry.get('store', 'Unknown')
+            date_val = entry.get('date', 'N/A')
+            with st.sidebar.expander(f"🧾 {store_name} ({date_val})"):
+                st.write(f"**Total:** ${entry.get('total')}")
+                if 'items' in entry:
+                    st.dataframe(pd.DataFrame(entry.get('items')), hide_index=True)
+    else:
+        st.sidebar.info("No history found.")
+
+if st.sidebar.button("🗑️ Clear All History"):
+    clear_history()
+    st.sidebar.success("History Cleared!")
+    st.rerun()

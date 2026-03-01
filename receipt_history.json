@@ -1,0 +1,120 @@
+[
+    {
+        "store": "Quest Provider",
+        "date": "October 27, 2023",
+        "total": 3966.3,
+        "items": [
+            {
+                "name": "Property maintenance services (hourly)",
+                "qty": 20,
+                "price": 80.0,
+                "category": "Others"
+            },
+            {
+                "name": "Yard maintenance services (hourly)",
+                "qty": 20,
+                "price": 80.0,
+                "category": "Others"
+            },
+            {
+                "name": "One-off junk removal",
+                "qty": 1,
+                "price": 310.0,
+                "category": "Others"
+            }
+        ],
+        "advice": "Don't just remove junk, remove junk expenses from your budget too!"
+    },
+    {
+        "store": "Green Supermarket",
+        "date": null,
+        "total": 27.35,
+        "items": [
+            {
+                "name": "APPLE",
+                "qty": 2,
+                "price": 1.0,
+                "category": "Food"
+            },
+            {
+                "name": "BANANA",
+                "qty": 3,
+                "price": 1.5,
+                "category": "Food"
+            },
+            {
+                "name": "ORANGE",
+                "qty": 2,
+                "price": 1.2,
+                "category": "Food"
+            },
+            {
+                "name": "PEAR",
+                "qty": 1,
+                "price": 0.75,
+                "category": "Food"
+            },
+            {
+                "name": "GRAPES",
+                "qty": 2,
+                "price": 3.0,
+                "category": "Food"
+            },
+            {
+                "name": "STRAWBERRY",
+                "qty": 1,
+                "price": 2.5,
+                "category": "Food"
+            },
+            {
+                "name": "BLUEBERRY",
+                "qty": 1,
+                "price": 2.0,
+                "category": "Food"
+            },
+            {
+                "name": "KIWI",
+                "qty": 2,
+                "price": 1.8,
+                "category": "Food"
+            },
+            {
+                "name": "WATERMELON",
+                "qty": 1,
+                "price": 4.5,
+                "category": "Food"
+            },
+            {
+                "name": "LEMON",
+                "qty": 1,
+                "price": 0.6,
+                "category": "Food"
+            },
+            {
+                "name": "RASPBERRY",
+                "qty": 1,
+                "price": 3.0,
+                "category": "Food"
+            },
+            {
+                "name": "MILK",
+                "qty": 1,
+                "price": 1.5,
+                "category": "Drinks"
+            },
+            {
+                "name": "CHEESE",
+                "qty": 1,
+                "price": 2.8,
+                "category": "Food"
+            },
+            {
+                "name": "YOGURT",
+                "qty": 1,
+                "price": 1.2,
+                "category": "Food"
+            }
+        ],
+        "advice": "Buying produce is a great start, but remember: a fruit a day keeps the budget in play!"
+    }
+]
