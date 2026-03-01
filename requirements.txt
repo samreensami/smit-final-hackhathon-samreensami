@@ -1,7 +1,7 @@
-flask
+streamlit==1.31.0
 google-generativeai
 pillow
 python-dotenv
 pandas
 plotly
-streamlit
+altair==4.2.2
